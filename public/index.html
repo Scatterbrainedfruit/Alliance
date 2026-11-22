@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111b1b">
+  <meta name="description" content="A shared, turn-based Tank Turn Tactics board for playing with friends.">
+  <title>Tank Turn Tactics — Field HQ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Tank Turn Tactics home">
+      <span class="brand-mark"><span></span><span></span><span></span></span>
+      <span class="brand-name">TANK TURN <b>TACTICS</b></span>
+    </a>
+    <div class="header-right">
+      <span class="connection-pill" id="connectionStatus"><i></i> Connecting</span>
+      <span class="header-edition">FRIENDS &amp; FOES EDITION</span>
+    </div>
+  </header>
+
+  <main id="landingView" class="landing-wrap">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="eyebrow-line"></span> THE WORLD'S SLOWEST ARMS RACE</div>
+        <h1>Small moves.<br><em>Long memories.</em></h1>
+        <p class="hero-text">A shared board for questionable alliances, suspiciously timed betrayals, and turns that may take an entire day.</p>
+        <div class="hero-tags"><span>● LIVE MULTIPLAYER</span><span>● PERSISTENT GAMES</span><span>● 2–12 PLAYERS</span></div>
+      </div>
+      <div class="hero-board-art" aria-hidden="true">
+        <div class="art-grid">
+          <span></span><span></span><span></span><span class="art-rock"></span><span></span><span></span>
+          <span></span><span class="art-tank tank-a">▰</span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span class="art-rock"></span><span></span>
+          <span class="art-rock"></span><span></span><span></span><span class="art-tank tank-b">▰</span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span class="art-heart">✦</span><span></span><span></span><span></span>
+        </div>
+        <div class="art-coordinate coord-one">F-02 / CONTACT</div>
+        <div class="art-coordinate coord-two">FIELD MAP 01</div>
+      </div>
+    </section>
+
+    <section class="lobby-actions">
+      <article class="action-card create-card">
+        <div class="card-index">01 / COMMAND</div>
+        <div class="card-heading-row"><h2>Create a game</h2><span class="card-icon">＋</span></div>
+        <p>Start a new room, choose the board and invite everyone in.</p>
+        <form id="createForm" class="game-form">
+          <label for="createName">Your callsign</label>
+          <input id="createName" name="name" maxlength="20" placeholder="e.g. General Nonsense" autocomplete="nickname" required>
+          <div class="form-split">
+            <div>
+              <label for="boardSize">Board size</label>
+              <select id="boardSize" name="size">
+                <option value="11">11 × 11 · Compact</option>
+                <option value="13" selected>13 × 13 · Standard</option>
+                <option value="15">15 × 15 · Spacious</option>
+                <option value="17">17 × 17 · Vast</option>
+              </select>
+            </div>
+            <div>
+              <label for="apSpeed">AP interval</label>
+              <select id="apSpeed" name="tickMinutes">
+                <option value="1">1 minute · Test</option>
+                <option value="60">1 hour</option>
+                <option value="1440" selected>24 hours · Classic</option>
+              </select>
+            </div>
+          </div>
+          <button class="button button-primary button-wide" type="submit">Create room <span>↗</span></button>
+        </form>
+      </article>
+
+      <article class="action-card join-card">
+        <div class="card-index">02 / REINFORCEMENTS</div>
+        <div class="card-heading-row"><h2>Join a game</h2><span class="card-icon join-icon">↳</span></div>
+        <p>Got an invite code? Enter it here and report for duty.</p>
+        <form id="joinForm" class="game-form">
+          <label for="joinName">Your callsign</label>
+          <input id="joinName" name="name" maxlength="20" placeholder="What should we call you?" autocomplete="nickname" required>
+          <label for="roomCode">Room code</label>
+          <input id="roomCode" name="code" class="code-input" maxlength="6" placeholder="ABC123" autocomplete="off" spellcheck="false" required>
+          <button class="button button-secondary button-wide" type="submit">Join room <span>↗</span></button>
+        </form>
+      </article>
+    </section>
+
+    <section class="rules-strip">
+      <div class="rules-title"><span class="mini-crosshair">◎</span><div><small>FIELD MANUAL</small><strong>THE BASICS</strong></div></div>
+      <div class="rule-item"><b>01</b><span>Start with <strong>3 HP</strong><br>and no AP.</span></div>
+      <div class="rule-item"><b>02</b><span>Gain <strong>1 AP</strong><br>each tick.</span></div>
+      <div class="rule-item"><b>03</b><span>Move, upgrade,<br>or <strong>make a friend.</strong></span></div>
+      <div class="rule-item"><b>04</b><span>Last tank<br><strong>standing wins.</strong></span></div>
+    </section>
+    <footer class="landing-footer"><span>UNOFFICIAL FRIENDS-AND-FOES BOARD</span><span>NO REAL TANKS. NO REAL DRAMA. PROBABLY.</span></footer>
+  </main>
+
+  <main id="gameView" class="game-wrap" hidden>
+    <div class="game-topline">
+      <div>
+        <div class="eyebrow"><span class="eyebrow-line"></span> FIELD HQ / LIVE OPERATION</div>
+        <h1 id="gameTitle">Operation <em>Untitled</em></h1>
+      </div>
+      <div class="room-tools">
+        <div class="room-code-block"><small>ROOM CODE</small><strong id="roomCodeDisplay">------</strong></div>
+        <button id="copyInvite" class="button button-small button-outline" type="button">Copy invite link <span>↗</span></button>
+        <button id="leaveRoom" class="icon-button" type="button" aria-label="Leave room" title="Leave room">×</button>
+      </div>
+    </div>
+
+    <section id="lobbyPanel" class="waiting-panel" hidden>
+      <div class="waiting-main">
+        <div class="waiting-mark">⌁</div>
+        <div class="eyebrow">ASSEMBLING THE SQUAD</div>
+        <h2>Waiting for the others.</h2>
+        <p>Send the invite link to your friends. The board will be generated when the host starts the game.</p>
+        <button id="startGame" class="button button-primary" type="button">Start game <span>↗</span></button>
+        <p class="host-note" id="hostNote">Only the room host can start the game.</p>
+      </div>
+      <div class="waiting-roster-panel">
+        <div class="panel-label"><span>01 / ROSTER</span><b id="lobbyCount">0 PLAYERS</b></div>
+        <div id="lobbyRoster" class="lobby-roster"></div>
+      </div>
+    </section>
+
+    <section id="activePanel" class="active-layout" hidden>
+      <div class="board-column">
+        <div class="board-meta">
+          <div class="board-meta-left"><span class="live-dot"></span><span id="boardStatus">LIVE BOARD</span><span class="meta-divider">/</span><span id="boardDimensions">13 × 13 GRID</span></div>
+          <div class="tick-display"><span>NEXT AP DROP</span><strong id="nextTick">--:--:--</strong></div>
+        </div>
+        <div class="board-frame">
+          <div class="board-axis board-axis-top" id="axisTop"></div>
+          <div class="board-grid-row">
+            <div class="board-axis board-axis-side" id="axisSide"></div>
+            <div id="board" class="board" role="grid" aria-label="Tank Turn Tactics game board"></div>
+          </div>
+          <div class="board-legend">
+            <span><i class="legend-player"></i> Player</span>
+            <span><i class="legend-rock"></i> Rock</span>
+            <span><i class="legend-heart">✦</i> Bonus heart</span>
+            <span><i class="legend-range"></i> In range</span>
+          </div>
+        </div>
+        <div class="action-bar">
+          <div class="action-bar-head"><div><small>02 / YOUR COMMANDS</small><strong id="actionPrompt">Choose an action</strong></div><span class="ap-balance"><b id="myAp">0</b><small>YOUR AP</small></span></div>
+          <div class="action-buttons">
+            <button class="action-button" data-mode="move" type="button"><span class="action-symbol">↗</span><b>Move</b><small>1 AP</small></button>
+            <button class="action-button" data-mode="attack" type="button"><span class="action-symbol">◎</span><b>Attack</b><small>1 AP</small></button>
+            <button class="action-button" data-mode="gift-ap" type="button"><span class="action-symbol">⇢</span><b>Gift AP</b><small>1 AP</small></button>
+            <button class="action-button" data-mode="gift-heart" type="button"><span class="action-symbol">♡</span><b>Gift heart</b><small>3 AP</small></button>
+            <button id="healButton" class="action-button upgrade-button" type="button"><span class="action-symbol">＋</span><b>Add HP</b><small>3 AP</small></button>
+            <button id="upgradeButton" class="action-button upgrade-button" type="button"><span class="action-symbol">⌖</span><b>Upgrade range</b><small>3 AP</small></button>
+          </div>
+          <div id="juryVoteBlock" class="jury-vote-block" hidden></div>
+          <div class="action-hint" id="actionHint">Select an action, then select a square or player on the board.</div>
+        </div>
+      </div>
+
+      <aside class="sidebar">
+        <section class="side-panel your-status-panel">
+          <div class="panel-label"><span>03 / YOUR TANK</span><span id="myStatus" class="status-live">ACTIVE</span></div>
+          <div class="your-tank-row">
+            <div id="myTankBadge" class="large-tank-badge">T</div>
+            <div class="your-tank-name"><strong id="myName">Player</strong><small id="myCoords">POSITION --</small></div>
+          </div>
+          <div class="stat-grid">
+            <div><small>HEALTH</small><strong id="myHp">3 HP</strong></div>
+            <div><small>RANGE</small><strong id="myRange">2 CELLS</strong></div>
+            <div><small>AP</small><strong id="myApSmall">0</strong></div>
+          </div>
+        </section>
+
+        <section class="side-panel roster-panel">
+          <div class="panel-label"><span>04 / FIELD ROSTER</span><b id="rosterCount">0 PLAYERS</b></div>
+          <div id="playerRoster" class="player-roster"></div>
+        </section>
+
+        <section class="side-panel log-panel">
+          <div class="panel-label"><span>05 / FIELD LOG</span><span class="log-live">● LIVE</span></div>
+          <div id="eventLog" class="event-log"></div>
+        </section>
+
+        <section class="side-panel chat-panel">
+          <div class="panel-label"><span>06 / COMMS</span><span>ROOM CHAT</span></div>
+          <div id="chatMessages" class="chat-messages"></div>
+          <form id="chatForm" class="chat-form">
+            <input id="chatInput" maxlength="240" placeholder="Send a message…" autocomplete="off">
+            <button type="submit" aria-label="Send message">↗</button>
+          </form>
+        </section>
+      </aside>
+    </section>
+
+    <section id="finishedPanel" class="finished-panel" hidden>
+      <div class="finished-mark">★</div>
+      <div class="eyebrow">OPERATION COMPLETE</div>
+      <h2 id="winnerTitle">The last tank standing.</h2>
+      <p>The board is now locked. The field log and chat remain available above.</p>
+      <div id="finalRoster" class="final-roster"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "tank-turn-tactics",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A shared, browser-based Tank Turn Tactics board game for friends.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "socket.io": "^4.8.1"
+  }
+}
