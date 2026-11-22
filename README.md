@@ -1,6 +1,6 @@
-# Tank Turn Tactics — Friends & Foes Edition
+# Alliance - A tank turn tactics inspired game
 
-A mobile-friendly, shared Tank Turn Tactics board for a private group of friends. Players join the same room from separate devices; actions are checked by the server and the board updates for everyone in real time.
+A mobile-friendly, shared board for a private group of friends. Players join the same room from separate devices; actions are checked by the server and the board updates for everyone in real time.
 
 ## Features
 
