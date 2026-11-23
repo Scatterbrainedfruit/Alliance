@@ -34,12 +34,12 @@
       </div>
       <div class="hero-board-art" aria-hidden="true">
         <div class="art-grid">
-          <span></span><span></span><span></span><span class="art-rock"></span><span></span><span></span>
-          <span></span><span class="art-tank tank-a">▰</span><span></span><span></span><span></span><span></span>
-          <span></span><span></span><span></span><span></span><span class="art-rock"></span><span></span>
-          <span class="art-rock"></span><span></span><span></span><span class="art-tank tank-b">▰</span><span></span><span></span>
           <span></span><span></span><span></span><span></span><span></span><span></span>
-          <span></span><span></span><span class="art-heart">✦</span><span></span><span></span><span></span>
+          <span></span><span class="art-tank tank-a">▰</span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span class="art-tank tank-b">▰</span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span>
         </div>
         <div class="art-coordinate coord-one">F-02 / CONTACT</div>
         <div class="art-coordinate coord-two">FIELD MAP 01</div>
@@ -143,9 +143,8 @@
           </div>
           <div class="board-legend">
             <span><i class="legend-player"></i> Player</span>
-            <span><i class="legend-rock"></i> Rock</span>
-            <span><i class="legend-heart">✦</i> Bonus heart</span>
-            <span><i class="legend-range"></i> In range</span>
+            <span><i class="legend-range"></i> Selected range</span>
+            <span><i class="legend-plan"></i> Planned route</span>
           </div>
         </div>
         <div class="action-bar">
@@ -159,8 +158,61 @@
             <button id="upgradeButton" class="action-button upgrade-button" type="button"><span class="action-symbol">⌖</span><b>Upgrade range</b><small>3 AP</small></button>
           </div>
           <div id="juryVoteBlock" class="jury-vote-block" hidden></div>
-          <div class="action-hint" id="actionHint">Select an action, then select a square or player on the board.</div>
+          <div class="action-foot">
+            <div class="action-hint" id="actionHint">Select an action, then select a square or player on the board.</div>
+            <button id="planningToggle" class="button button-small button-outline planning-toggle" type="button">◎ Private planning</button>
+          </div>
         </div>
+
+        <section id="planningPanel" class="planning-panel" hidden>
+          <div class="planning-header">
+            <div>
+              <div class="eyebrow"><span class="eyebrow-line"></span> PRIVATE WORKSPACE / LOCAL ONLY</div>
+              <h3>Planning mode</h3>
+              <p>Your draft stays in this browser. It is never sent to the game server or shown to other players. Range is measured in orthogonal steps (Manhattan distance).</p>
+            </div>
+            <button id="planningClose" class="icon-button" type="button" aria-label="Close planning mode" title="Close planning mode">×</button>
+          </div>
+          <div class="planning-summary">
+            <div><small>AP BUDGET</small><strong id="planBudget">0</strong></div>
+            <div><small>PLANNED COST</small><strong id="planCost">0</strong></div>
+            <div><small>AP REMAINING</small><strong id="planRemaining">0</strong></div>
+            <div><small>PLANNED POSITION</small><strong id="planPosition">—</strong></div>
+            <div><small>PLANNED RANGE</small><strong id="planRange">—</strong></div>
+            <div><small>PROJECTED HP</small><strong id="planHp">—</strong></div>
+          </div>
+          <div class="planning-grid">
+            <div class="planning-actions">
+              <div class="planning-section-title"><span>01 / BUILD YOUR PLAN</span><small>CLICK A TOOL, THEN THE BOARD</small></div>
+              <div class="plan-action-buttons">
+                <button type="button" data-plan-mode="move"><b>Move</b><small>1 AP / square</small></button>
+                <button type="button" data-plan-mode="attack"><b>Attack</b><small>1 AP</small></button>
+                <button type="button" data-plan-mode="gift-ap"><b>Gift AP</b><small>1 AP</small></button>
+                <button type="button" data-plan-mode="gift-heart"><b>Gift heart</b><small>3 AP</small></button>
+                <button type="button" data-plan-mode="heal"><b>Add HP</b><small>3 AP</small></button>
+                <button type="button" data-plan-mode="upgrade"><b>Upgrade range</b><small>3 AP</small></button>
+              </div>
+              <p id="planHint" class="plan-hint">Choose a planned action. Move one square at a time to draw a route.</p>
+              <div class="plan-settings-row">
+                <label for="planFutureTicks">AP drops before executing</label>
+                <input id="planFutureTicks" type="number" min="0" max="30" step="1" value="0">
+              </div>
+              <div class="plan-toolbar">
+                <button id="undoPlan" type="button" class="button button-small button-outline">Undo last</button>
+                <button id="clearPlan" type="button" class="button button-small button-outline">Clear plan</button>
+                <button id="copyPlan" type="button" class="button button-small button-primary">Copy plan</button>
+              </div>
+              <div class="planning-section-title plan-queue-title"><span>02 / ACTION QUEUE</span><small id="planActionCount">0 ACTIONS</small></div>
+              <div id="planQueue" class="plan-queue"><p class="plan-empty">No actions planned yet.</p></div>
+            </div>
+            <div class="planning-opponents">
+              <div class="planning-section-title"><span>03 / OPPONENT AP ESTIMATES</span><small>YOUR PRIVATE GUESSES</small></div>
+              <p class="plan-hint">Enter what you think each opponent currently has. The forecast adds one AP per projected tick for living players.</p>
+              <div id="planOpponentEstimates" class="plan-opponent-estimates"><p class="plan-empty">Player estimates will appear here.</p></div>
+              <div class="plan-privacy-note">These estimates are saved only in this browser on this device. They are not shared with the room.</div>
+            </div>
+          </div>
+        </section>
       </div>
 
       <aside class="sidebar">

@@ -34,23 +34,15 @@ function manhattan(a, b) {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
-function cellKey(x, y) {
-  return `${x},${y}`;
-}
-
 function occupied(room, x, y, exceptId = null) {
   return Object.values(room.players).some((p) => p.id !== exceptId && p.x === x && p.y === y);
-}
-
-function isRock(room, x, y) {
-  return room.rocks.some((rock) => rock.x === x && rock.y === y);
 }
 
 function randomFreeCell(room, minDistanceFromPlayers = 0) {
   const cells = [];
   for (let y = 0; y < room.size; y += 1) {
     for (let x = 0; x < room.size; x += 1) {
-      if (isRock(room, x, y) || occupied(room, x, y)) continue;
+      if (occupied(room, x, y)) continue;
       const farEnough = Object.values(room.players).filter((p) => Number.isInteger(p.x) && Number.isInteger(p.y)).every((p) => manhattan(p, { x, y }) >= minDistanceFromPlayers);
       if (farEnough) cells.push({ x, y });
     }
@@ -92,8 +84,6 @@ function createRoom({ name, clientKey, size = 13, tickMinutes = 1440 }) {
     startedAt: null,
     nextTickAt: null,
     players: { [player.id]: player },
-    rocks: [],
-    heart: null,
     juryVotes: {},
     tickNumber: 0,
     winnerId: null,
@@ -122,8 +112,6 @@ function startGame(room, hostId) {
   const players = Object.values(room.players);
   if (players.length < 2) throw new Error("At least two players are needed to start.");
 
-  room.rocks = [];
-  room.heart = null;
   room.juryVotes = {};
   room.tickNumber = 0;
   for (const player of players) {
@@ -136,7 +124,7 @@ function startGame(room, hostId) {
     player.y = null;
   }
 
-  // Give each player a separated starting square before placing rocks.
+  // Give each player a separated starting square on the open board.
   for (const player of players) {
     const spot = randomFreeCell(room, 3);
     if (!spot) throw new Error("There is not enough room for everyone. Choose a larger board.");
@@ -144,17 +132,11 @@ function startGame(room, hostId) {
     player.y = spot.y;
   }
 
-  const rockCount = Math.floor(room.size * room.size * 0.085);
-  for (let i = 0; i < rockCount; i += 1) {
-    const spot = randomFreeCell(room, 0);
-    if (!spot) break;
-    room.rocks.push(spot);
-  }
 
   room.status = "active";
   room.startedAt = Date.now();
   room.nextTickAt = Date.now() + room.tickMinutes * 60_000;
-  addLog(room, `The game has begun. Every player starts with 3 HP and 0 AP.`, "important");
+  // The field log is deliberately reserved for movement and combat events.
 }
 
 function applyElapsedTicks(room, now = Date.now()) {
@@ -175,21 +157,9 @@ function applyElapsedTicks(room, now = Date.now()) {
     }
     for (const [targetId, votes] of Object.entries(voteCounts)) {
       const target = room.players[targetId];
-      if (target?.alive && votes >= 3) {
-        target.ap += 1;
-        addLog(room, `The Jury awarded ${target.name} 1 bonus AP.`, "important");
-      }
+      if (target?.alive && votes >= 3) target.ap += 1;
     }
     room.juryVotes = {};
-
-    if (!room.heart) {
-      const spot = randomFreeCell(room, 0);
-      if (spot) {
-        room.heart = spot;
-        addLog(room, `A bonus heart has appeared at ${String.fromCharCode(65 + spot.x)}${spot.y + 1}.`);
-      }
-    }
-    addLog(room, `AP tick ${room.tickNumber}: living players received 1 AP.`, "tick");
     room.nextTickAt += tickMs;
     changed = true;
   }
@@ -228,32 +198,25 @@ function performAction(room, playerId, action) {
     const y = Number(action.y);
     if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= room.size || y >= room.size) throw new Error("That square is outside the board.");
     if (manhattan(actor, { x, y }) !== 1) throw new Error("You can only move one square up, down, left or right.");
-    if (isRock(room, x, y)) throw new Error("That square is blocked by a rock.");
     if (occupied(room, x, y, actor.id)) throw new Error("That square is already occupied.");
     spend(actor, 1);
     actor.x = x;
     actor.y = y;
-    if (room.heart && room.heart.x === x && room.heart.y === y) {
-      actor.hp += 1;
-      room.heart = null;
-      addLog(room, `${actor.name} collected the bonus heart and gained 1 HP.`, "important");
-    } else {
-      addLog(room, `${actor.name} moved to ${String.fromCharCode(65 + x)}${y + 1}.`);
-    }
+    addLog(room, `${actor.name} moved to ${String.fromCharCode(65 + x)}${y + 1}.`, "location");
   } else if (type === "attack") {
     const target = room.players[String(action.targetId)];
     if (!target || !target.alive || target.id === actor.id) throw new Error("Choose a living opponent.");
     if (manhattan(actor, target) > actor.range) throw new Error("That player is outside your range.");
     spend(actor, 1);
     target.hp -= 1;
-    addLog(room, `${actor.name} hit ${target.name}. ${target.name} has ${Math.max(0, target.hp)} HP left.`, "action");
+    addLog(room, `${target.name} was hit.`, "hit");
     if (target.hp <= 0) {
       target.hp = 0;
       target.alive = false;
       target.killedBy = actor.id;
-      actor.ap += target.ap;
+      // Eliminated players lose any unspent AP; it is never transferred.
       target.ap = 0;
-      addLog(room, `${target.name}'s tank is out of action. Their remaining AP went to ${actor.name}.`, "important");
+      addLog(room, `${actor.name} got the last hit on ${target.name}.`, "last-hit");
     }
   } else if (type === "upgrade") {
     spend(actor, 3);
@@ -269,7 +232,6 @@ function performAction(room, playerId, action) {
     if (manhattan(actor, target) > actor.range) throw new Error("That player is outside your range.");
     spend(actor, 1);
     target.ap += 1;
-    addLog(room, `${actor.name} gave 1 AP to ${target.name}.`, "action");
   } else if (type === "gift-heart") {
     const target = room.players[String(action.targetId)];
     if (!target || target.id === actor.id) throw new Error("Choose another player to receive the heart.");
@@ -300,7 +262,7 @@ function castJuryVote(room, playerId, targetId) {
   if (!target || !target.alive) throw new Error("Choose a living player to receive your vote.");
   if (room.juryVotes[playerId]) throw new Error("You have already voted in this AP cycle.");
   room.juryVotes[playerId] = targetId;
-  addLog(room, `${voter.name} cast a Jury vote.`, "normal");
+
 }
 
 function addChatMessage(room, playerId, text) {
@@ -311,6 +273,47 @@ function addChatMessage(room, playerId, text) {
   room.chat ??= [];
   room.chat.push({ id: makeId(), playerId, name: player.name, colour: player.colour, message, at: Date.now() });
   room.chat = room.chat.slice(-60);
+}
+
+function publicFieldLog(room) {
+  const entries = Array.isArray(room.log) ? room.log : [];
+  const visible = [];
+  const legacyLastHit = /^(.+?)'s tank is out of action\. Their remaining AP went to (.+)\.$/;
+  const legacyHit = /^(.+?) hit (.+)\. \2 has (\d+) HP left\.$/;
+  const legacyMove = /^(.+?) moved to ([A-Z]\d+)\.$/;
+
+  for (const entry of entries) {
+    const message = String(entry.message ?? "");
+    if (entry.type === "location" || legacyMove.test(message)) {
+      if (entry.type === "location") {
+        visible.push({ ...entry, type: "location" });
+      } else {
+        const match = message.match(legacyMove);
+        visible.push({ ...entry, message: `${match[1]} moved to ${match[2]}.`, type: "location" });
+      }
+      continue;
+    }
+    if (entry.type === "hit") {
+      visible.push({ ...entry, type: "hit" });
+      continue;
+    }
+    if (entry.type === "last-hit") {
+      visible.push({ ...entry, type: "last-hit" });
+      continue;
+    }
+
+    // Clean up old rooms created before this restricted field log existed.
+    const oldHit = message.match(legacyHit);
+    if (oldHit) {
+      visible.push({ ...entry, message: `${oldHit[2]} was hit.`, type: "hit" });
+      continue;
+    }
+    const oldLastHit = message.match(legacyLastHit);
+    if (oldLastHit) {
+      visible.push({ ...entry, message: `${oldLastHit[2]} got the last hit on ${oldLastHit[1]}.`, type: "last-hit" });
+    }
+  }
+  return visible.slice(0, 70);
 }
 
 function publicState(room, playerId) {
@@ -326,7 +329,6 @@ function publicState(room, playerId) {
     hp: p.hp,
     range: p.range,
     alive: p.alive,
-    killedBy: p.killedBy,
     hasVoted: Boolean(room.juryVotes?.[p.id])
   }));
   return {
@@ -338,9 +340,7 @@ function publicState(room, playerId) {
     tickNumber: room.tickNumber,
     winnerId: room.winnerId,
     players,
-    rocks: room.rocks,
-    heart: room.heart,
-    log: room.log,
+    log: publicFieldLog(room),
     chat: room.chat,
     me: {
       id: me.id,
@@ -364,6 +364,7 @@ module.exports = {
   makeRoomCode,
   performAction,
   publicState,
+  publicFieldLog,
   startGame,
   manhattan
 };

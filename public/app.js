@@ -11,7 +11,11 @@
     nextTick: $("nextTick"), actionPrompt: $("actionPrompt"), actionHint: $("actionHint"), myAp: $("myAp"), myApSmall: $("myApSmall"),
     myName: $("myName"), myHp: $("myHp"), myRange: $("myRange"), myCoords: $("myCoords"), myStatus: $("myStatus"), myTankBadge: $("myTankBadge"),
     roster: $("playerRoster"), rosterCount: $("rosterCount"), log: $("eventLog"), chat: $("chatMessages"), chatForm: $("chatForm"), chatInput: $("chatInput"),
-    heal: $("healButton"), upgrade: $("upgradeButton"), jury: $("juryVoteBlock"), winner: $("winnerTitle"), finalRoster: $("finalRoster"), toast: $("toast")
+    heal: $("healButton"), upgrade: $("upgradeButton"), jury: $("juryVoteBlock"), winner: $("winnerTitle"), finalRoster: $("finalRoster"), toast: $("toast"),
+    planningToggle: $("planningToggle"), planningPanel: $("planningPanel"), planningClose: $("planningClose"),
+    planBudget: $("planBudget"), planCost: $("planCost"), planRemaining: $("planRemaining"), planPosition: $("planPosition"), planRange: $("planRange"), planHp: $("planHp"),
+    planHint: $("planHint"), planFutureTicks: $("planFutureTicks"), planQueue: $("planQueue"), planActionCount: $("planActionCount"),
+    planOpponentEstimates: $("planOpponentEstimates"), undoPlan: $("undoPlan"), clearPlan: $("clearPlan"), copyPlan: $("copyPlan")
   };
 
   let currentState = null;
@@ -23,6 +27,11 @@
   let toastTimer = null;
   let lastConnected = false;
   let refreshTimer = null;
+  let planningOpen = false;
+  let planMode = null;
+  let planActions = [];
+  let planFutureTicks = 0;
+  let apEstimates = {};
 
   function randomKey() {
     if (window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
@@ -37,6 +46,7 @@
 
   function playerStorageKey(code) { return `ttt-player-${code}`; }
   function nameStorageKey(code) { return `ttt-name-${code}`; }
+  function estimateStorageKey(code, playerKey) { return `ttt-ap-estimates-${code}-${playerKey}`; }
 
   function setConnection(connected) {
     elements.connection.classList.toggle("connected", connected);
@@ -66,6 +76,11 @@
     currentPlayerName = null;
     currentPlayerId = null;
     selectedMode = null;
+    planningOpen = false;
+    planMode = null;
+    planActions = [];
+    apEstimates = {};
+    elements.planningPanel.hidden = true;
     if (refreshTimer) clearInterval(refreshTimer);
     history.replaceState({}, "", window.location.pathname);
   }
@@ -91,6 +106,15 @@
     currentPlayerName = playerName || state.me.name;
     currentPlayerId = state.me.id;
     selectedMode = null;
+    planningOpen = false;
+    planMode = null;
+    planActions = [];
+    planFutureTicks = 0;
+    apEstimates = loadApEstimates(state.code, state.me.id);
+    elements.planningPanel.hidden = true;
+    elements.planningToggle.classList.remove("active");
+    elements.planningToggle.textContent = "◎ Private planning";
+    elements.planFutureTicks.value = "0";
     localStorage.setItem(playerStorageKey(state.code), clientKey);
     localStorage.setItem(nameStorageKey(state.code), state.me.name);
     history.replaceState({}, "", `${window.location.pathname}?room=${encodeURIComponent(state.code)}`);
@@ -177,6 +201,7 @@
     renderLog(state);
     renderChat(state);
     renderJury(state);
+    if (planningOpen) renderPlanning();
     elements.boardStatus.textContent = isFinished ? "OPERATION COMPLETE" : "LIVE BOARD";
     if (isFinished) {
       const winner = state.players.find((player) => player.id === state.winnerId);
@@ -215,9 +240,13 @@
     for (const player of state.players) {
       if (Number.isInteger(player.x) && Number.isInteger(player.y)) playerAt.set(`${player.x},${player.y}`, player);
     }
-    const rocks = new Set(state.rocks.map((rock) => `${rock.x},${rock.y}`));
     const me = state.me;
     const myTank = state.players.find((player) => player.id === me.id);
+    const plan = planningOpen ? derivePlan() : null;
+    const displayX = planningOpen ? plan.x : myTank?.x;
+    const displayY = planningOpen ? plan.y : myTank?.y;
+    const displayRange = planningOpen ? plan.range : me.range;
+    const activeMode = planningOpen ? planMode : selectedMode;
     const cells = [];
     const topLabels = [];
     const sideLabels = [];
@@ -226,41 +255,59 @@
     elements.axisTop.innerHTML = topLabels.join("");
     elements.axisSide.innerHTML = sideLabels.join("");
 
-    const validMove = state.status === "active" && me.alive && selectedMode === "move" && me.ap >= 1;
-    const validTarget = state.status === "active" && me.alive && ["attack", "gift-ap", "gift-heart"].includes(selectedMode);
+    const liveMove = !planningOpen && state.status === "active" && me.alive && selectedMode === "move" && me.ap >= 1;
+    const liveTarget = !planningOpen && state.status === "active" && me.alive && ["attack", "gift-ap", "gift-heart"].includes(selectedMode);
+    const planMove = planningOpen && state.status === "active" && me.alive && planMode === "move";
+    const planTarget = planningOpen && state.status === "active" && me.alive && ["attack", "gift-ap", "gift-heart"].includes(planMode);
+    const pathSteps = new Map();
+    if (planningOpen) {
+      let stepNo = 0;
+      for (const action of planActions) {
+        if (action.type === "move") {
+          stepNo += 1;
+          pathSteps.set(`${action.x},${action.y}`, stepNo);
+        }
+      }
+    }
+
     for (let y = 0; y < size; y += 1) {
       for (let x = 0; x < size; x += 1) {
         const key = `${x},${y}`;
         const player = playerAt.get(key);
-        const isRock = rocks.has(key);
-        const isHeart = state.heart?.x === x && state.heart?.y === y;
-        const distance = myTank ? Math.abs(myTank.x - x) + Math.abs(myTank.y - y) : Number.POSITIVE_INFINITY;
+        const distance = Number.isInteger(displayX) && Number.isInteger(displayY)
+          ? Math.abs(displayX - x) + Math.abs(displayY - y)
+          : Number.POSITIVE_INFINITY;
         const adjacent = distance === 1;
-        const inRange = distance > 0 && distance <= me.range;
-        const canMove = validMove && !player && !isRock && adjacent;
-        const canTarget = validTarget && player && player.id !== me.id && inRange && (selectedMode === "gift-heart" || player.alive);
+        const inRange = distance > 0 && distance <= displayRange;
+        const canMove = (liveMove || planMove) && (!player || player.id === me.id) && adjacent;
+        const targetMode = activeMode;
+        const canTargetPlayer = player && player.id !== me.id && inRange && (
+          targetMode === "gift-heart" || player.alive
+        );
         const classes = ["board-cell"];
-        if (isRock) classes.push("rock");
         if (canMove) classes.push("can-move");
-        if (canTarget) classes.push("can-target");
-        if (validTarget && inRange && player && player.id !== me.id) classes.push("range-cell");
-        if (isHeart) classes.push("heart-cell");
+        if ((liveTarget || planTarget) && inRange) classes.push(planningOpen ? "plan-range-cell" : "range-cell");
+        if ((liveTarget || planTarget) && canTargetPlayer) classes.push("can-target");
         if (player?.id === me.id) classes.push("selected-cell");
+        if (planningOpen && pathSteps.has(key)) classes.push("plan-route-cell");
+        if (planningOpen && x === plan.x && y === plan.y) classes.push("plan-position-cell");
 
         let content = "";
         let title = `${String.fromCharCode(65 + x)}${y + 1}`;
-        if (isRock) {
-          content = `<span class="rock-shape"></span>`;
-          title += " · Rock";
-        } else if (player) {
+        if (player) {
           const playerName = escapeHTML(player.name);
           const dead = !player.alive;
           content = `<span class="tank-token ${player.id === me.id ? "you" : ""} ${dead ? "dead" : ""}" style="background:${safeColour(player.colour)}">${dead ? "×" : "T"}</span>`;
           title += ` · ${playerName} · ${player.hp} HP${dead ? " · OUT" : ""}`;
-        } else if (isHeart) {
-          content = `<span class="bonus-heart">✦</span>`;
-          title += " · Bonus heart";
         }
+        if (planningOpen && pathSteps.has(key)) {
+          content += `<span class="plan-step-badge">${pathSteps.get(key)}</span>`;
+        }
+        if (planningOpen && x === plan.x && y === plan.y && (x !== myTank?.x || y !== myTank?.y)) {
+          content += `<span class="plan-ghost-marker">P</span>`;
+          title += " · Planned position";
+        }
+        if ((liveTarget || planTarget) && inRange) title += ` · In ${displayRange}-cell range`;
         cells.push(`<button type="button" role="gridcell" class="${classes.join(" ")}" data-x="${x}" data-y="${y}" aria-label="${escapeHTML(title)}" title="${escapeHTML(title)}">${content}</button>`);
       }
     }
@@ -344,16 +391,265 @@
     }
   }
 
+  function loadApEstimates(roomCode, playerId) {
+    try {
+      const stored = localStorage.getItem(estimateStorageKey(roomCode, playerId));
+      const parsed = stored ? JSON.parse(stored) : {};
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function saveApEstimates() {
+    if (!currentRoom || !currentPlayerId) return;
+    try {
+      localStorage.setItem(estimateStorageKey(currentRoom, currentPlayerId), JSON.stringify(apEstimates));
+    } catch {
+      showToast("Your AP estimates could not be saved in this browser.", true);
+    }
+  }
+
+  function derivePlan() {
+    const myTank = currentState?.players.find((player) => player.id === currentState.me.id);
+    let x = myTank?.x ?? 0;
+    let y = myTank?.y ?? 0;
+    let range = currentState?.me.range ?? 0;
+    let hp = currentState?.me.hp ?? 0;
+    let cost = 0;
+    const targetHp = {};
+    const targetAlive = {};
+    for (const player of currentState?.players ?? []) {
+      targetHp[player.id] = player.hp;
+      targetAlive[player.id] = player.alive;
+    }
+
+    for (const action of planActions) {
+      cost += action.cost;
+      if (action.type === "move") { x = action.x; y = action.y; }
+      if (action.type === "upgrade") range += 1;
+      if (action.type === "heal") hp += 1;
+      if (action.type === "attack" && action.targetId) {
+        targetHp[action.targetId] = Math.max(0, (targetHp[action.targetId] ?? 0) - 1);
+        if (targetHp[action.targetId] === 0) targetAlive[action.targetId] = false;
+      }
+      if (action.type === "gift-heart" && action.targetId) {
+        targetHp[action.targetId] = Math.max(1, (targetHp[action.targetId] ?? 0) + (targetAlive[action.targetId] ? 1 : 0));
+        targetAlive[action.targetId] = true;
+      }
+    }
+    return { x, y, range, hp, cost, targetHp, targetAlive };
+  }
+
+  function planBudget() {
+    return (currentState?.me.ap ?? 0) + planFutureTicks;
+  }
+
+  function planCoordinate(x, y) {
+    return `${String.fromCharCode(65 + x)}${y + 1}`;
+  }
+
+  function queuePlanAction(action) {
+    const plan = derivePlan();
+    if (plan.cost + action.cost > planBudget()) {
+      showToast(`That plan costs ${plan.cost + action.cost} AP, but your projected budget is ${planBudget()} AP.`, true);
+      return;
+    }
+    planActions.push(action);
+    if (action.type !== "move") planMode = null;
+    updatePlanModeButtons();
+    renderPlanning();
+    renderBoard(currentState);
+  }
+
+  function updatePlanModeButtons() {
+    document.querySelectorAll("[data-plan-mode]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.planMode === planMode);
+    });
+  }
+
+  function renderPlanning() {
+    if (!planningOpen || !currentState) return;
+    elements.planningPanel.hidden = false;
+    const plan = derivePlan();
+    const budget = planBudget();
+    const remaining = budget - plan.cost;
+    elements.planBudget.textContent = String(budget);
+    elements.planCost.textContent = String(plan.cost);
+    elements.planRemaining.textContent = String(remaining);
+    elements.planPosition.textContent = planCoordinate(plan.x, plan.y);
+    elements.planRange.textContent = `${plan.range} CELLS`;
+    elements.planHp.textContent = `${plan.hp} HP`;
+    elements.planActionCount.textContent = `${planActions.length} ACTION${planActions.length === 1 ? "" : "S"}`;
+    elements.planRemaining.classList.toggle("negative", remaining < 0);
+
+    const prompts = {
+      move: `Click an empty square one step from your planned position (${planCoordinate(plan.x, plan.y)}). Each square costs 1 AP.`,
+      attack: `Click a living opponent within ${plan.range} cells of ${planCoordinate(plan.x, plan.y)}.`,
+      "gift-ap": `Click a living player within ${plan.range} cells of ${planCoordinate(plan.x, plan.y)}.`,
+      "gift-heart": `Click any player within ${plan.range} cells of ${planCoordinate(plan.x, plan.y)}.`,
+      heal: "Add HP has been queued when selected.",
+      upgrade: "Range upgrade has been queued when selected."
+    };
+    elements.planHint.textContent = prompts[planMode] || "Choose an action. Move one square at a time to draw a route; target actions use your planned position.";
+    updatePlanModeButtons();
+
+    elements.planQueue.innerHTML = planActions.length ? planActions.map((action, index) => {
+      let description = "";
+      if (action.type === "move") description = `Move to ${planCoordinate(action.x, action.y)}`;
+      else if (action.type === "attack" && action.targetName) {
+        description = `Attack · ${escapeHTML(action.targetName)} (${action.targetHpBefore} → ${Math.max(0, action.targetHpBefore - 1)} HP)`;
+      } else if (action.type === "gift-heart" && action.targetName) {
+        const result = action.targetWasAlive
+          ? `${action.targetHpBefore} → ${action.targetHpAfter} HP`
+          : `revive · ${action.targetHpAfter} HP`;
+        description = `Gift heart · ${escapeHTML(action.targetName)} (${result})`;
+      } else if (action.targetName) description = `${planActionName(action.type)} · ${escapeHTML(action.targetName)}`;
+      else description = planActionName(action.type);
+      return `<div class="plan-queue-item"><span class="plan-queue-index">${index + 1}</span><span>${description}</span><small>${action.cost} AP</small></div>`;
+    }).join("") : `<p class="plan-empty">No actions planned yet. Choose a tool above and build a route or action sequence.</p>`;
+
+    renderOpponentEstimates();
+    elements.undoPlan.disabled = planActions.length === 0;
+    elements.clearPlan.disabled = planActions.length === 0;
+    elements.copyPlan.disabled = planActions.length === 0;
+  }
+
+  function planActionName(type) {
+    return ({ move: "Move", attack: "Attack", "gift-ap": "Gift 1 AP", "gift-heart": "Gift heart", heal: "Add 1 HP", upgrade: "Upgrade range" })[type] || type;
+  }
+
+  function renderOpponentEstimates() {
+    const opponents = currentState.players.filter((player) => player.id !== currentState.me.id);
+    if (!opponents.length) {
+      elements.planOpponentEstimates.innerHTML = `<p class="plan-empty">No opponents to estimate yet.</p>`;
+      return;
+    }
+    elements.planOpponentEstimates.innerHTML = opponents.map((player) => {
+      const raw = apEstimates[player.id];
+      const hasEstimate = raw !== undefined && raw !== "";
+      const value = hasEstimate ? Math.max(0, Math.floor(Number(raw) || 0)) : 0;
+      const plannedGifts = planActions.filter((action) => action.type === "gift-ap" && action.targetId === player.id).length;
+      const forecast = hasEstimate ? `${value + (player.alive ? planFutureTicks : 0) + plannedGifts} AP` : "—";
+      return `<label class="plan-opponent-row">
+        <span class="plan-opponent-name"><i class="player-colour-dot" style="background:${safeColour(player.colour)}"></i>${escapeHTML(player.name)}${player.alive ? "" : " · OUT"}</span>
+        <span class="plan-opponent-input"><input type="number" min="0" max="999" step="1" inputmode="numeric" data-estimate-player="${player.id}" aria-label="Estimated AP for ${escapeHTML(player.name)}" value="${raw === undefined ? "" : escapeHTML(raw)}" placeholder="?"> <small>AP now</small></span>
+        <span class="plan-opponent-forecast">${forecast} after ${planFutureTicks} tick${planFutureTicks === 1 ? "" : "s"}${plannedGifts ? ` + ${plannedGifts} planned AP gift${plannedGifts === 1 ? "" : "s"}` : ""}</span>
+      </label>`;
+    }).join("");
+  }
+
+  function handlePlanningBoardClick(x, y, player) {
+    if (!planMode) {
+      elements.planHint.textContent = "Choose a planning tool first. Your current planned position is " + planCoordinate(derivePlan().x, derivePlan().y) + ".";
+      return;
+    }
+    const plan = derivePlan();
+    if (planMode === "move") {
+      const distance = Math.abs(plan.x - x) + Math.abs(plan.y - y);
+      if (distance !== 1) {
+        showToast("Plan movement one adjacent square at a time.", true);
+        return;
+      }
+      if (player && player.id !== currentState.me.id) {
+        showToast("That square is occupied by another player.", true);
+        return;
+      }
+      queuePlanAction({ type: "move", x, y, cost: 1 });
+      return;
+    }
+
+    if (!["attack", "gift-ap", "gift-heart"].includes(planMode)) return;
+    if (!player || player.id === currentState.me.id) {
+      showToast("Select an opponent on the board.", true);
+      return;
+    }
+    if (planMode !== "gift-heart" && !plan.targetAlive[player.id]) {
+      showToast("That planned action requires a living player.", true);
+      return;
+    }
+    const distance = Math.abs(plan.x - player.x) + Math.abs(plan.y - player.y);
+    if (distance === 0 || distance > plan.range) {
+      showToast(`That player is outside your planned range of ${plan.range} cells.`, true);
+      return;
+    }
+    const cost = planMode === "gift-heart" ? 3 : 1;
+    const targetHpBefore = plan.targetHp[player.id] ?? player.hp;
+    const targetWasAlive = Boolean(plan.targetAlive[player.id]);
+    const targetHpAfter = planMode === "gift-heart"
+      ? (targetWasAlive ? targetHpBefore + 1 : 1)
+      : targetHpBefore;
+    queuePlanAction({
+      type: planMode,
+      targetId: player.id,
+      targetName: player.name,
+      targetHpBefore,
+      targetHpAfter,
+      targetWasAlive,
+      cost
+    });
+  }
+
+  function togglePlanning(forceOpen) {
+    if (!currentState) return;
+    const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : !planningOpen;
+    if (shouldOpen && (!currentState.me.alive || currentState.status !== "active")) {
+      showToast("Planning mode is available while your tank is active.", true);
+      return;
+    }
+    planningOpen = shouldOpen;
+    planMode = null;
+    selectedMode = null;
+    elements.planningPanel.hidden = !planningOpen;
+    elements.planningToggle.classList.toggle("active", planningOpen);
+    elements.planningToggle.textContent = planningOpen ? "◎ Planning open" : "◎ Private planning";
+    updatePlanModeButtons();
+    if (planningOpen) renderPlanning();
+    renderBoard(currentState);
+  }
+
+  function planSummaryText() {
+    const plan = derivePlan();
+    const lines = [
+      `Tank Turn Tactics — private plan for ${currentState.me.name}`,
+      `Current AP: ${currentState.me.ap}`,
+      `Projected AP budget: ${planBudget()} (${planFutureTicks} future tick(s))`,
+      `Planned AP cost: ${plan.cost}`,
+      `AP remaining: ${planBudget() - plan.cost}`,
+      `Planned position: ${planCoordinate(plan.x, plan.y)}`,
+      `Planned range: ${plan.range} cells`,
+      `Projected HP after queued heals: ${plan.hp}`,
+      "",
+      "Actions:",
+      ...planActions.map((action, index) => {
+        const target = action.targetName ? ` — ${action.targetName}` : "";
+        const expectedHp = action.type === "attack" ? ` (target HP ${action.targetHpBefore} → ${Math.max(0, action.targetHpBefore - 1)})` : "";
+        const expectedHeart = action.type === "gift-heart" && action.targetName
+          ? (action.targetWasAlive ? ` (target HP ${action.targetHpBefore} → ${action.targetHpAfter})` : " (revive to 1 HP)")
+          : "";
+        return `${index + 1}. ${action.type === "move" ? `Move to ${planCoordinate(action.x, action.y)}` : planActionName(action.type) + target}${expectedHp}${expectedHeart} (${action.cost} AP)`;
+      }),
+      "",
+      "Private AP estimates:",
+      ...currentState.players.filter((player) => player.id !== currentState.me.id).map((player) => {
+        const guess = apEstimates[player.id] === undefined || apEstimates[player.id] === "" ? "unknown" : apEstimates[player.id];
+        return `${player.name}: ${guess} AP now`;
+      })
+    ];
+    return lines.join("\n");
+  }
+
   function setMode(mode) {
+    if (planningOpen) togglePlanning(false);
     selectedMode = selectedMode === mode ? null : mode;
     for (const button of document.querySelectorAll(".action-button[data-mode]")) {
       button.classList.toggle("active", button.dataset.mode === selectedMode);
     }
     const prompts = {
       move: "Select an adjacent empty square to move into.",
-      attack: "Select a living opponent within your range.",
-      "gift-ap": "Select a living player within your range to gift 1 AP.",
-      "gift-heart": "Select a player within your range. A heart can revive an eliminated player."
+      attack: `Range radius: ${currentState.me.range} orthogonal steps (Manhattan distance). Select a living opponent in the highlighted area.`,
+      "gift-ap": `Gift range: ${currentState.me.range} orthogonal steps (Manhattan distance). Select a living player in the highlighted area.`,
+      "gift-heart": `Gift range: ${currentState.me.range} orthogonal steps (Manhattan distance). Select a player in the highlighted area; this can revive them.`
     };
     elements.actionPrompt.textContent = selectedMode ? `${selectedMode.replace("-", " ").toUpperCase()} SELECTED` : "Choose an action";
     elements.actionHint.textContent = prompts[selectedMode] || "Select an action, then select a square or player on the board.";
@@ -370,10 +666,20 @@
       button.classList.toggle("active", button.dataset.mode === selectedMode);
     }
     if (!state.me.alive && state.status === "active") {
+      planningOpen = false;
+      planMode = null;
+      elements.planningPanel.hidden = true;
+      elements.planningToggle.classList.remove("active");
+      elements.planningToggle.textContent = "◎ Private planning";
       elements.actionPrompt.textContent = "Your tank is out of action";
       elements.actionHint.textContent = "You can still chat and vote as part of the Jury. Another player may revive you with a gifted heart.";
       selectedMode = null;
     } else if (state.status === "finished") {
+      planningOpen = false;
+      planMode = null;
+      elements.planningPanel.hidden = true;
+      elements.planningToggle.classList.remove("active");
+      elements.planningToggle.textContent = "◎ Private planning";
       elements.actionPrompt.textContent = "Operation complete";
       elements.actionHint.textContent = "The last tank standing has won. The board is now locked.";
       selectedMode = null;
@@ -386,11 +692,15 @@
     const x = Number(cell.dataset.x);
     const y = Number(cell.dataset.y);
     const player = currentState.players.find((p) => p.x === x && p.y === y);
+    if (planningOpen) {
+      handlePlanningBoardClick(x, y, player);
+      return;
+    }
     if (!selectedMode) {
       if (player && player.id !== currentState.me.id) {
         elements.actionHint.textContent = `${player.name}: ${player.alive ? `${player.hp} HP · range ${player.range}` : "eliminated"}. Choose an action to interact with them.`;
       } else if (player?.id === currentState.me.id) {
-        elements.actionHint.textContent = `Your tank is at ${String.fromCharCode(65 + x)}${y + 1}. Choose an action above.`;
+        elements.actionHint.textContent = `Your tank is at ${planCoordinate(x, y)}. Choose an action above.`;
       }
       return;
     }
@@ -408,6 +718,12 @@
   function sendAction(action) {
     request("game-action", action, () => {
       selectedMode = null;
+      planActions = [];
+      planMode = null;
+      planningOpen = false;
+      elements.planningPanel.hidden = true;
+      elements.planningToggle.classList.remove("active");
+      elements.planningToggle.textContent = "◎ Private planning";
       for (const button of document.querySelectorAll(".action-button[data-mode]")) button.classList.remove("active");
       elements.actionPrompt.textContent = "Choose an action";
       elements.actionHint.textContent = "Action submitted. The shared board has been updated.";
@@ -456,6 +772,56 @@
   });
   elements.board.addEventListener("click", handleBoardClick);
   document.querySelectorAll(".action-button[data-mode]").forEach((button) => button.addEventListener("click", () => setMode(button.dataset.mode)));
+  elements.planningToggle.addEventListener("click", () => togglePlanning());
+  elements.planningClose.addEventListener("click", () => togglePlanning(false));
+  document.querySelectorAll("[data-plan-mode]").forEach((button) => button.addEventListener("click", () => {
+    if (!planningOpen) return;
+    const mode = button.dataset.planMode;
+    if (mode === "heal" || mode === "upgrade") {
+      const cost = 3;
+      queuePlanAction({ type: mode, cost });
+    } else {
+      planMode = planMode === mode ? null : mode;
+      updatePlanModeButtons();
+      renderPlanning();
+      renderBoard(currentState);
+    }
+  }));
+  elements.planFutureTicks.addEventListener("change", () => {
+    planFutureTicks = Math.max(0, Math.min(30, Math.floor(Number(elements.planFutureTicks.value) || 0)));
+    elements.planFutureTicks.value = String(planFutureTicks);
+    renderPlanning();
+    renderBoard(currentState);
+  });
+  elements.planOpponentEstimates.addEventListener("change", (event) => {
+    const input = event.target.closest("[data-estimate-player]");
+    if (!input) return;
+    const playerId = input.dataset.estimatePlayer;
+    const value = input.value.trim();
+    apEstimates[playerId] = value === "" ? "" : String(Math.max(0, Math.min(999, Math.floor(Number(value) || 0))));
+    saveApEstimates();
+    renderPlanning();
+  });
+  elements.undoPlan.addEventListener("click", () => {
+    planActions.pop();
+    planMode = null;
+    renderPlanning();
+    renderBoard(currentState);
+  });
+  elements.clearPlan.addEventListener("click", () => {
+    planActions = [];
+    planMode = null;
+    renderPlanning();
+    renderBoard(currentState);
+  });
+  elements.copyPlan.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(planSummaryText());
+      showToast("Private plan copied to your clipboard.");
+    } catch {
+      showToast("Clipboard access was unavailable. Your plan is still shown here.", true);
+    }
+  });
   elements.heal.addEventListener("click", () => sendAction({ type: "heal" }));
   elements.upgrade.addEventListener("click", () => sendAction({ type: "upgrade" }));
   elements.chatForm.addEventListener("submit", (event) => {
