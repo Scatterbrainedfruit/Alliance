@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#111b1b">
-  <meta name="description" content="A shared, turn-based Tank Turn Tactics board for playing with friends.">
+  <meta name="description" content="A shared, turn-based Tank Turn Tactics multiplayer strategy board.">
   <title>Tank Turn Tactics — Field HQ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,7 +20,7 @@
     </a>
     <div class="header-right">
       <span class="connection-pill" id="connectionStatus"><i></i> Connecting</span>
-      <span class="header-edition">FRIENDS &amp; FOES EDITION</span>
+      <span class="header-edition">MULTIPLAYER STRATEGY BOARD</span>
     </div>
   </header>
 
@@ -30,14 +30,14 @@
         <div class="eyebrow"><span class="eyebrow-line"></span> THE WORLD'S SLOWEST ARMS RACE</div>
         <h1>Small moves.<br><em>Long memories.</em></h1>
         <p class="hero-text">A shared board for questionable alliances, suspiciously timed betrayals, and turns that may take an entire day.</p>
-        <div class="hero-tags"><span>● LIVE MULTIPLAYER</span><span>● PERSISTENT GAMES</span><span>● 2–12 PLAYERS</span></div>
+        <div class="hero-tags"><span>● LIVE MULTIPLAYER</span><span>● PERSISTENT GAMES</span><span>● UP TO 32 ARMIES</span></div>
       </div>
       <div class="hero-board-art" aria-hidden="true">
         <div class="art-grid">
           <span></span><span></span><span></span><span></span><span></span><span></span>
-          <span></span><span class="art-tank tank-a">▰</span><span></span><span></span><span></span><span></span>
+          <span></span><span class="art-army army-a">▰</span><span></span><span></span><span></span><span></span>
           <span></span><span></span><span></span><span></span><span></span><span></span>
-          <span></span><span></span><span></span><span class="art-tank tank-b">▰</span><span></span><span></span>
+          <span></span><span></span><span></span><span class="art-army army-b">▰</span><span></span><span></span>
           <span></span><span></span><span></span><span></span><span></span><span></span>
           <span></span><span></span><span></span><span></span><span></span><span></span>
         </div>
@@ -50,29 +50,31 @@
       <article class="action-card create-card">
         <div class="card-index">01 / COMMAND</div>
         <div class="card-heading-row"><h2>Create a game</h2><span class="card-icon">＋</span></div>
-        <p>Start a new room, choose the board and invite everyone in.</p>
+        <p>Set up a room, customise the board and invite other commanders.</p>
         <form id="createForm" class="game-form">
           <label for="createName">Your callsign</label>
           <input id="createName" name="name" maxlength="20" placeholder="e.g. General Nonsense" autocomplete="nickname" required>
           <div class="form-split">
             <div>
-              <label for="boardSize">Board size</label>
-              <select id="boardSize" name="size">
-                <option value="11">11 × 11 · Compact</option>
-                <option value="13" selected>13 × 13 · Standard</option>
-                <option value="15">15 × 15 · Spacious</option>
-                <option value="17">17 × 17 · Vast</option>
-              </select>
+              <label for="boardWidth">Board width</label>
+              <input id="boardWidth" name="width" type="number" min="6" max="40" value="13" required>
             </div>
             <div>
-              <label for="apSpeed">AP interval</label>
-              <select id="apSpeed" name="tickMinutes">
-                <option value="1">1 minute · Test</option>
-                <option value="60">1 hour</option>
-                <option value="1440" selected>24 hours · Classic</option>
-              </select>
+              <label for="boardHeight">Board height</label>
+              <input id="boardHeight" name="height" type="number" min="6" max="40" value="13" required>
             </div>
           </div>
+          <div class="form-split">
+            <div>
+              <label for="apSpeed">AP interval (minutes)</label>
+              <input id="apSpeed" name="tickMinutes" type="number" min="1" max="10080" value="1440" required>
+            </div>
+            <div>
+              <label for="firstTickAt">First AP tick · your local time</label>
+              <input id="firstTickAt" name="firstTickAt" type="datetime-local" required>
+            </div>
+          </div>
+          <p class="form-note">Choose any interval from 1 minute to 7 days. Later AP ticks repeat at that interval from the first tick time.</p>
           <button class="button button-primary button-wide" type="submit">Create room <span>↗</span></button>
         </form>
       </article>
@@ -80,13 +82,20 @@
       <article class="action-card join-card">
         <div class="card-index">02 / REINFORCEMENTS</div>
         <div class="card-heading-row"><h2>Join a game</h2><span class="card-icon join-icon">↳</span></div>
-        <p>Got an invite code? Enter it here and report for duty.</p>
+        <p>Enter a room code, then create a new army or request to join an existing one.</p>
         <form id="joinForm" class="game-form">
           <label for="joinName">Your callsign</label>
           <input id="joinName" name="name" maxlength="20" placeholder="What should we call you?" autocomplete="nickname" required>
           <label for="roomCode">Room code</label>
           <input id="roomCode" name="code" class="code-input" maxlength="6" placeholder="ABC123" autocomplete="off" spellcheck="false" required>
-          <button class="button button-secondary button-wide" type="submit">Join room <span>↗</span></button>
+          <button id="previewRoom" class="button button-small button-outline button-wide" type="button">Find armies in room</button>
+          <div id="joinOptions" class="join-options" hidden>
+            <label for="joinArmySelect">Army to join</label>
+            <select id="joinArmySelect"><option value="">Choose an army…</option></select>
+            <button class="button button-secondary button-wide" type="submit" id="createArmySubmit">Create a new army <span>↗</span></button>
+            <button class="button button-outline button-wide" type="button" id="requestArmyJoin">Request to join selected army</button>
+            <p id="joinRoomStatus" class="form-note"></p>
+          </div>
         </form>
       </article>
     </section>
@@ -95,10 +104,10 @@
       <div class="rules-title"><span class="mini-crosshair">◎</span><div><small>FIELD MANUAL</small><strong>THE BASICS</strong></div></div>
       <div class="rule-item"><b>01</b><span>Start with <strong>3 HP</strong><br>and no AP.</span></div>
       <div class="rule-item"><b>02</b><span>Gain <strong>1 AP</strong><br>each tick.</span></div>
-      <div class="rule-item"><b>03</b><span>Move, upgrade,<br>or <strong>make a friend.</strong></span></div>
-      <div class="rule-item"><b>04</b><span>Last tank<br><strong>standing wins.</strong></span></div>
+      <div class="rule-item"><b>03</b><span>Move, upgrade,<br>or <strong>support another army.</strong></span></div>
+      <div class="rule-item"><b>04</b><span>Last army<br><strong>standing wins.</strong></span></div>
     </section>
-    <footer class="landing-footer"><span>UNOFFICIAL FRIENDS-AND-FOES BOARD</span><span>NO REAL TANKS. NO REAL DRAMA. PROBABLY.</span></footer>
+    <footer class="landing-footer"><span>UNOFFICIAL MULTIPLAYER STRATEGY BOARD</span><span>JUST A BOARD GAME. NO REAL DRAMA. PROBABLY.</span></footer>
   </main>
 
   <main id="gameView" class="game-wrap" hidden>
@@ -117,15 +126,16 @@
     <section id="lobbyPanel" class="waiting-panel" hidden>
       <div class="waiting-main">
         <div class="waiting-mark">⌁</div>
-        <div class="eyebrow">ASSEMBLING THE SQUAD</div>
+        <div class="eyebrow">ASSEMBLING THE ARMIES</div>
         <h2>Waiting for the others.</h2>
-        <p>Send the invite link to your friends. The board will be generated when the host starts the game.</p>
+        <p>Share the room code. Each commander can create an army or request to join an existing one. The board appears when the host starts the game.</p>
         <button id="startGame" class="button button-primary" type="button">Start game <span>↗</span></button>
         <p class="host-note" id="hostNote">Only the room host can start the game.</p>
       </div>
       <div class="waiting-roster-panel">
         <div class="panel-label"><span>01 / ROSTER</span><b id="lobbyCount">0 PLAYERS</b></div>
         <div id="lobbyRoster" class="lobby-roster"></div>
+        <div id="lobbyMembership" class="army-membership"></div>
       </div>
     </section>
 
@@ -139,10 +149,10 @@
           <div class="board-axis board-axis-top" id="axisTop"></div>
           <div class="board-grid-row">
             <div class="board-axis board-axis-side" id="axisSide"></div>
-            <div id="board" class="board" role="grid" aria-label="Tank Turn Tactics game board"></div>
+            <div id="board" class="board" role="grid" aria-label="Tank Turn Tactics army board"></div>
           </div>
           <div class="board-legend">
-            <span><i class="legend-player"></i> Player</span>
+            <span><i class="legend-player"></i> Army</span>
             <span><i class="legend-range"></i> Selected range</span>
             <span><i class="legend-plan"></i> Planned route</span>
           </div>
@@ -159,7 +169,7 @@
           </div>
           <div id="juryVoteBlock" class="jury-vote-block" hidden></div>
           <div class="action-foot">
-            <div class="action-hint" id="actionHint">Select an action, then select a square or player on the board.</div>
+            <div class="action-hint" id="actionHint">Select an action, then select a square or army on the board.</div>
             <button id="planningToggle" class="button button-small button-outline planning-toggle" type="button">◎ Private planning</button>
           </div>
         </div>
@@ -169,9 +179,13 @@
             <div>
               <div class="eyebrow"><span class="eyebrow-line"></span> PRIVATE WORKSPACE / LOCAL ONLY</div>
               <h3>Planning mode</h3>
-              <p>Your draft stays in this browser. It is never sent to the game server or shown to other players. Range is measured in orthogonal steps (Manhattan distance).</p>
+              <p>Your drafts and AP estimates stay in this browser. You can switch between armies and plan each army's moves, attacks and gifts. Nothing is sent to the game server or shown to other commanders.</p>
             </div>
             <button id="planningClose" class="icon-button" type="button" aria-label="Close planning mode" title="Close planning mode">×</button>
+          </div>
+          <div class="plan-army-select-row">
+            <label for="planningArmySelect">Plan for army</label>
+            <select id="planningArmySelect"></select>
           </div>
           <div class="planning-summary">
             <div><small>AP BUDGET</small><strong id="planBudget">0</strong></div>
@@ -206,8 +220,8 @@
               <div id="planQueue" class="plan-queue"><p class="plan-empty">No actions planned yet.</p></div>
             </div>
             <div class="planning-opponents">
-              <div class="planning-section-title"><span>03 / OPPONENT AP ESTIMATES</span><small>YOUR PRIVATE GUESSES</small></div>
-              <p class="plan-hint">Enter what you think each opponent currently has. The forecast adds one AP per projected tick for living players.</p>
+              <div class="planning-section-title"><span>03 / ARMY AP ESTIMATES</span><small>YOUR PRIVATE GUESSES</small></div>
+              <p class="plan-hint">Set a private AP estimate for any other army, then select it above to plan its moves. Living armies gain one AP per projected tick.</p>
               <div id="planOpponentEstimates" class="plan-opponent-estimates"><p class="plan-empty">Player estimates will appear here.</p></div>
               <div class="plan-privacy-note">These estimates are saved only in this browser on this device. They are not shared with the room.</div>
             </div>
@@ -217,10 +231,10 @@
 
       <aside class="sidebar">
         <section class="side-panel your-status-panel">
-          <div class="panel-label"><span>03 / YOUR TANK</span><span id="myStatus" class="status-live">ACTIVE</span></div>
-          <div class="your-tank-row">
-            <div id="myTankBadge" class="large-tank-badge">T</div>
-            <div class="your-tank-name"><strong id="myName">Player</strong><small id="myCoords">POSITION --</small></div>
+          <div class="panel-label"><span>03 / YOUR ARMY</span><span id="myStatus" class="status-live">ACTIVE</span></div>
+          <div class="your-army-row">
+            <div id="myArmyBadge" class="large-army-badge">A</div>
+            <div class="your-army-name"><strong id="myName">Player</strong><small id="myCoords">POSITION --</small></div>
           </div>
           <div class="stat-grid">
             <div><small>HEALTH</small><strong id="myHp">3 HP</strong></div>
@@ -230,17 +244,22 @@
         </section>
 
         <section class="side-panel roster-panel">
-          <div class="panel-label"><span>04 / FIELD ROSTER</span><b id="rosterCount">0 PLAYERS</b></div>
+          <div class="panel-label"><span>04 / FIELD ROSTER</span><b id="rosterCount">0 ARMIES</b></div>
           <div id="playerRoster" class="player-roster"></div>
         </section>
 
+        <section class="side-panel army-members-panel">
+          <div class="panel-label"><span>05 / ARMY MEMBERSHIP</span><span>DEVICES &amp; REQUESTS</span></div>
+          <div id="armyMembership" class="army-membership"></div>
+        </section>
+
         <section class="side-panel log-panel">
-          <div class="panel-label"><span>05 / FIELD LOG</span><span class="log-live">● LIVE</span></div>
+          <div class="panel-label"><span>06 / FIELD LOG</span><span class="log-live">● LIVE</span></div>
           <div id="eventLog" class="event-log"></div>
         </section>
 
         <section class="side-panel chat-panel">
-          <div class="panel-label"><span>06 / COMMS</span><span>ROOM CHAT</span></div>
+          <div class="panel-label"><span>07 / COMMS</span><span>ROOM CHAT</span></div>
           <div id="chatMessages" class="chat-messages"></div>
           <form id="chatForm" class="chat-form">
             <input id="chatInput" maxlength="240" placeholder="Send a message…" autocomplete="off">
@@ -253,9 +272,24 @@
     <section id="finishedPanel" class="finished-panel" hidden>
       <div class="finished-mark">★</div>
       <div class="eyebrow">OPERATION COMPLETE</div>
-      <h2 id="winnerTitle">The last tank standing.</h2>
-      <p>The board is now locked. The field log and chat remain available above.</p>
+      <h2 id="winnerTitle">The last army standing.</h2>
+      <p>The game is complete. Final AP is now public, and you can review the board after every recorded event.</p>
       <div id="finalRoster" class="final-roster"></div>
+      <section class="replay-panel">
+        <div class="replay-heading"><strong>GAME REPLAY</strong><span id="replayCount">0 EVENTS</span></div>
+        <input id="replaySlider" class="replay-slider" type="range" min="0" max="0" value="0" step="1" aria-label="Game replay event">
+        <div id="replayLabel" class="replay-label">No replay history available.</div>
+        <div id="replayRoster" class="replay-roster"></div>
+      </section>
+    </section>
+  </main>
+
+  <main id="joinPendingView" class="join-pending-wrap" hidden>
+    <section class="finished-panel">
+      <div class="eyebrow">ARMY MEMBERSHIP REQUEST</div>
+      <h2>Waiting for approval.</h2>
+      <p>Your request has been sent to the selected army. This page will update automatically when they accept or decline.</p>
+      <button id="cancelJoinWait" class="button button-outline" type="button">Back to landing page</button>
     </section>
   </main>
 

@@ -18,7 +18,7 @@ function setup() {
   return { room, alpha, bravo };
 }
 
-test("a room starts with separated tanks, health and zero AP", () => {
+test("a room starts with separated armies, health and zero AP", () => {
   const { room, alpha, bravo } = setup();
   assert.equal(room.status, "active");
   assert.equal(alpha.hp, 3);
@@ -149,4 +149,127 @@ test("AP gifts change AP but create no field-log entry", () => {
   assert.equal(alpha.ap, 1);
   assert.equal(bravo.ap, 1);
   assert.equal(publicState(room, alpha.id).log.length, 0);
+});
+
+const {
+  MAX_ARMIES,
+  requestArmyJoin,
+  respondArmyJoin
+} = require("../game-engine");
+
+test("custom board dimensions and exact first AP tick time are preserved", () => {
+  const firstTickAt = Date.now() + 30 * 60 * 1000;
+  const room = createRoom({
+    name: "Widefield",
+    clientKey: "widefield-session-key-123",
+    width: 20,
+    height: 9,
+    tickMinutes: 37,
+    firstTickAt
+  });
+  const host = Object.values(room.players)[0];
+  addPlayer(room, { name: "Second", clientKey: "second-session-key-1234" });
+  startGame(room, host.id);
+  assert.equal(room.width, 20);
+  assert.equal(room.height, 9);
+  assert.equal(room.tickMinutes, 37);
+  assert.equal(room.nextTickAt, firstTickAt);
+});
+
+test("room capacity is increased to 32 armies", () => {
+  const room = createRoom({ name: "Army1", clientKey: "army-1-session-key-123" });
+  for (let i = 2; i <= MAX_ARMIES; i += 1) {
+    addPlayer(room, { name: `Army${i}`, clientKey: `army-${i}-session-key-123` });
+  }
+  assert.equal(Object.keys(room.players).length, 32);
+  assert.throws(() => addPlayer(room, { name: "Army33", clientKey: "army-33-session-key-123" }), /room is full/i);
+});
+
+test("another device can request and be approved to join an existing army", () => {
+  const room = createRoom({ name: "Alpha", clientKey: "alpha-session-key-123" });
+  const alpha = Object.values(room.players)[0];
+  const bravo = addPlayer(room, { name: "Bravo", clientKey: "bravo-session-key-123" });
+  startGame(room, alpha.id);
+  const request = requestArmyJoin(room, {
+    armyId: bravo.id,
+    name: "Bravo tablet",
+    clientKey: "bravo-tablet-session-key-123"
+  });
+  assert.equal(publicState(room, alpha.id).me.joinRequests.length, 0);
+  assert.equal(publicState(room, bravo.id).me.joinRequests.length, 1);
+  const result = respondArmyJoin(room, bravo.id, request.id, true);
+  assert.equal(result.approved, true);
+  const bravoState = publicState(room, bravo.id);
+  assert.equal(bravoState.me.members.length, 2);
+  assert.deepEqual(bravoState.me.members.map((member) => member.name), ["Bravo", "Bravo tablet"]);
+  const reconnect = requestArmyJoin(room, {
+    armyId: bravo.id,
+    name: "Bravo tablet",
+    clientKey: "bravo-tablet-session-key-123"
+  });
+  assert.equal(reconnect.alreadyMember, true);
+});
+
+test("army membership requests can be declined without adding a member", () => {
+  const room = createRoom({ name: "Alpha", clientKey: "alpha-session-key-123" });
+  const alpha = Object.values(room.players)[0];
+  const bravo = addPlayer(room, { name: "Bravo", clientKey: "bravo-session-key-123" });
+  const request = requestArmyJoin(room, {
+    armyId: alpha.id,
+    name: "Guest device",
+    clientKey: "guest-device-session-key-123"
+  });
+  const result = respondArmyJoin(room, alpha.id, request.id, false);
+  assert.equal(result.approved, false);
+  assert.equal(publicState(room, alpha.id).me.members.length, 1);
+  assert.equal(publicState(room, alpha.id).me.joinRequests.length, 0);
+  assert.equal(publicState(room, bravo.id).me.members.length, 1);
+});
+
+test("AP gifts and Jury bonuses notify only the recipient army", () => {
+  const room = createRoom({ name: "Alpha", clientKey: "alpha-session-key-123" });
+  const alpha = Object.values(room.players)[0];
+  const bravo = addPlayer(room, { name: "Bravo", clientKey: "bravo-session-key-123" });
+  const charlie = addPlayer(room, { name: "Charlie", clientKey: "charlie-session-key-123" });
+  const delta = addPlayer(room, { name: "Delta", clientKey: "delta-session-key-123" });
+  const echo = addPlayer(room, { name: "Echo", clientKey: "echo-session-key-123" });
+  startGame(room, alpha.id);
+  alpha.x = 4; alpha.y = 4;
+  bravo.x = 5; bravo.y = 4;
+  alpha.ap = 2;
+  performAction(room, alpha.id, { type: "gift-ap", targetId: bravo.id });
+  assert.match(publicState(room, bravo.id).me.notifications[0].message, /Alpha gave your army 1 AP/);
+  assert.equal(publicState(room, alpha.id).me.notifications.length, 0);
+  assert.equal(publicState(room, charlie.id).me.notifications.length, 0);
+
+  charlie.alive = false;
+  delta.alive = false;
+  castJuryVote(room, charlie.id, bravo.id);
+  castJuryVote(room, delta.id, bravo.id);
+  // Three eliminated armies complete the Jury threshold.
+  echo.alive = false;
+  castJuryVote(room, echo.id, bravo.id);
+  applyElapsedTicks(room, room.nextTickAt);
+  const bravoMessages = publicState(room, bravo.id).me.notifications.map((notification) => notification.message);
+  assert.ok(bravoMessages.some((message) => /Jury awarded your army 1 AP/.test(message)));
+  assert.equal(publicState(room, alpha.id).me.notifications.some((item) => /Jury/.test(item.message)), false);
+  assert.equal(publicState(room, charlie.id).me.notifications.some((item) => /Jury/.test(item.message)), false);
+});
+
+test("finished games expose opponent AP and retain event-by-event board snapshots", () => {
+  const { room, alpha, bravo } = setup();
+  alpha.x = 4; alpha.y = 4;
+  bravo.x = 5; bravo.y = 4;
+  alpha.ap = 3;
+  bravo.hp = 1;
+  performAction(room, alpha.id, { type: "move", x: 4, y: 5 });
+  performAction(room, alpha.id, { type: "move", x: 4, y: 4 });
+  performAction(room, alpha.id, { type: "attack", targetId: bravo.id });
+  const finalState = publicState(room, alpha.id);
+  assert.equal(finalState.status, "finished");
+  assert.equal(finalState.players.find((army) => army.id === bravo.id).ap, 0);
+  assert.ok(finalState.history.length >= 4);
+  const finalSnapshot = finalState.history.at(-1);
+  assert.equal(finalSnapshot.players.find((army) => army.id === bravo.id).alive, false);
+  assert.equal(finalSnapshot.players.find((army) => army.id === alpha.id).ap, alpha.ap);
 });

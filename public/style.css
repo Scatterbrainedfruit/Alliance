@@ -72,9 +72,9 @@ h1 em, .game-topline h1 em { font-family: Georgia, serif; font-weight: 400; colo
 .hero-board-art::after { width: 1px; height: 28px; top: 16px; left: 16px; }
 .art-grid { display: grid; height: 100%; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(6, 1fr); border: 1px solid rgba(181, 216, 165, .19); }
 .art-grid > span { border: 1px solid rgba(181, 216, 165, .095); display: flex; align-items: center; justify-content: center; color: var(--mint); font-size: 20px; }
-.art-grid .art-tank { font-size: 22px; text-shadow: 0 0 16px currentColor; }
-.art-grid .tank-a { color: #65c5d9; }
-.art-grid .tank-b { color: #e8ad67; }
+.art-grid .art-army { font-size: 22px; text-shadow: 0 0 16px currentColor; }
+.art-grid .army-a { color: #65c5d9; }
+.art-grid .army-b { color: #e8ad67; }
 .art-coordinate { position: absolute; color: var(--dim); font: 8px var(--mono); letter-spacing: .1em; }
 .coord-one { bottom: 12px; right: 20px; }
 .coord-two { top: 12px; right: 18px; }
@@ -181,10 +181,10 @@ h1 em, .game-topline h1 em { font-family: Georgia, serif; font-weight: 400; colo
 .board-cell.plan-position-cell { outline: 2px dashed #8eb4ea; outline-offset: -4px; }
 .plan-step-badge { position: absolute; right: 1px; top: 1px; z-index: 3; min-width: 11px; height: 11px; padding: 0 2px; display: grid; place-items: center; background: var(--mint); color: #10201d; font: 7px var(--mono); }
 .plan-ghost-marker { position: absolute; left: 2px; bottom: 1px; z-index: 3; color: #a8cbf6; font: 700 8px var(--mono); text-shadow: 0 1px 3px #000; }
-.tank-token { width: 76%; height: 76%; border-radius: 3px; display: grid; place-items: center; color: #10201d; font: 700 clamp(8px, 1.4vw, 14px) var(--mono); border: 1px solid rgba(255,255,255,.5); box-shadow: 0 2px 4px rgba(0,0,0,.25); position: relative; }
-.tank-token::before { content: ""; position: absolute; width: 50%; height: 19%; left: 25%; top: -10%; border-radius: 3px 3px 0 0; background: inherit; border-top: 1px solid rgba(255,255,255,.4); }
-.tank-token.you { outline: 2px solid var(--text); outline-offset: 2px; }
-.tank-token.dead { filter: grayscale(1); opacity: .33; border-style: dashed; }
+.army-token { width: 76%; height: 76%; border-radius: 3px; display: grid; place-items: center; color: #10201d; font: 700 clamp(8px, 1.4vw, 14px) var(--mono); border: 1px solid rgba(255,255,255,.5); box-shadow: 0 2px 4px rgba(0,0,0,.25); position: relative; }
+.army-token::before { content: ""; position: absolute; width: 50%; height: 19%; left: 25%; top: -10%; border-radius: 3px 3px 0 0; background: inherit; border-top: 1px solid rgba(255,255,255,.4); }
+.army-token.you { outline: 2px solid var(--text); outline-offset: 2px; }
+.army-token.dead { filter: grayscale(1); opacity: .33; border-style: dashed; }
 .board-legend { padding: 13px 4px 2px; display: flex; flex-wrap: wrap; gap: 17px; color: var(--dim); font: 8px var(--mono); text-transform: uppercase; letter-spacing: .06em; }
 .board-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend-player { width: 9px; height: 9px; border-radius: 2px; background: var(--mint); display: inline-block; }
@@ -257,11 +257,11 @@ h1 em, .game-topline h1 em { font-family: Georgia, serif; font-weight: 400; colo
 .sidebar { display: grid; gap: 12px; }
 .side-panel { padding: 15px; background: rgba(25,40,39,.72); border: 1px solid var(--line); min-width: 0; }
 .status-live { color: var(--mint); }
-.your-tank-row { display: flex; align-items: center; gap: 12px; margin: 17px 0 15px; }
-.large-tank-badge { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.45); border-radius: 4px; color: #11201b; font: 700 17px var(--mono); box-shadow: 0 4px 14px rgba(0,0,0,.18); }
-.your-tank-name { display: flex; flex-direction: column; gap: 5px; }
-.your-tank-name strong { font-size: 13px; }
-.your-tank-name small { color: var(--dim); font: 8px var(--mono); letter-spacing: .08em; }
+.your-army-row { display: flex; align-items: center; gap: 12px; margin: 17px 0 15px; }
+.large-army-badge { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.45); border-radius: 4px; color: #11201b; font: 700 17px var(--mono); box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+.your-army-name { display: flex; flex-direction: column; gap: 5px; }
+.your-army-name strong { font-size: 13px; }
+.your-army-name small { color: var(--dim); font: 8px var(--mono); letter-spacing: .08em; }
 .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); padding-top: 12px; }
 .stat-grid > div { display: flex; flex-direction: column; gap: 5px; }
 .stat-grid > div + div { padding-left: 12px; border-left: 1px solid var(--line); }
@@ -272,6 +272,7 @@ h1 em, .game-topline h1 em { font-family: Georgia, serif; font-weight: 400; colo
 .roster-player.you { background: rgba(181,216,165,.07); border-color: rgba(181,216,165,.13); }
 .roster-player.dead { opacity: .52; }
 .roster-player-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.roster-member-count { display: block; margin-top: 3px; color: var(--dim); font: 7px var(--mono); letter-spacing: .04em; }
 .roster-player-stats { color: var(--muted); font: 8px var(--mono); white-space: nowrap; }
 .roster-player-stats .ap-private { color: var(--mint); }
 .log-live { color: var(--mint); font-size: 8px; }
@@ -372,3 +373,35 @@ h1 em, .game-topline h1 em { font-family: Georgia, serif; font-weight: 400; colo
 .jury-vote-block p { margin: 0; color: var(--muted); font-size: 10px; }
 .jury-vote-block select { max-width: 180px; min-width: 0; padding: 7px 8px; color: var(--text); background: #111d1d; border: 1px solid var(--line-strong); font-size: 10px; }
 .jury-vote-block button { padding: 8px 10px; color: #241d14; background: var(--orange); border: 0; font: 9px var(--mono); cursor: pointer; }
+
+/* v1.2.0 additions */
+.form-note { margin: 9px 0 0; color: var(--dim); font-size: 9px; line-height: 1.55; }
+.join-options { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.join-options .button { margin-top: 8px; }
+.join-pending-wrap { width: min(680px, calc(100% - 32px)); margin: 8vh auto 0; }
+.plan-army-select-row { display: flex; align-items: center; gap: 12px; margin: 15px 0 0; color: #abc7e9; font: 8px var(--mono); letter-spacing: .09em; text-transform: uppercase; }
+.plan-army-select-row select { min-width: 0; flex: 1; max-width: 320px; padding: 8px 10px; color: var(--text); background: #111d1d; border: 1px solid rgba(142,180,234,.35); font-size: 10px; }
+.army-membership { display: grid; gap: 8px; margin-top: 11px; }
+.army-member-line, .army-request-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; background: rgba(236,240,223,.035); border: 1px solid var(--line); color: var(--muted); font-size: 9px; }
+.army-member-line strong { color: var(--text); font-weight: 600; }
+.army-request-line { align-items: flex-start; flex-wrap: wrap; }
+.army-request-actions { display: flex; gap: 5px; margin-left: auto; }
+.army-request-actions button { padding: 5px 7px; border: 1px solid var(--line-strong); background: transparent; color: var(--text); font: 8px var(--mono); cursor: pointer; }
+.army-request-actions button.accept { color: var(--mint); border-color: rgba(181,216,165,.4); }
+.army-request-actions button.decline { color: var(--red); border-color: rgba(216,119,112,.4); }
+.replay-panel { max-width: 900px; margin: 24px auto 0; padding: 18px; text-align: left; border: 1px solid rgba(181,216,165,.22); background: rgba(13,23,23,.55); }
+.replay-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--mint); font: 9px var(--mono); letter-spacing: .1em; }
+.replay-heading span { color: var(--dim); }
+.replay-slider { width: 100%; margin: 17px 0 9px; accent-color: var(--mint); }
+.replay-label { padding: 9px 10px; color: var(--text); background: rgba(236,240,223,.045); border: 1px solid var(--line); font: 10px var(--mono); }
+.replay-roster { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 6px; margin-top: 10px; }
+.replay-army { padding: 8px; border: 1px solid var(--line); background: rgba(236,240,223,.025); font-size: 9px; line-height: 1.6; }
+.replay-army strong { display: block; }
+.replay-army small { color: var(--muted); font: 8px var(--mono); }
+.final-player .final-ap { color: var(--mint); display: block; margin-top: 4px; font: 9px var(--mono); }
+@media (max-width: 720px) {
+  .army-members-panel { grid-column: 1 / -1; }
+  .plan-army-select-row { align-items: stretch; flex-direction: column; gap: 7px; }
+  .plan-army-select-row select { width: 100%; max-width: none; }
+  .replay-panel { padding: 12px; }
+}

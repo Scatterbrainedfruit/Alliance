@@ -1,17 +1,21 @@
-# Tank Turn Tactics — Friends & Foes Edition
+# Tank Turn Tactics — Multiplayer Strategy Board
 
-A mobile-friendly, shared Tank Turn Tactics board for a private group of friends. Players join the same room from separate devices; actions are checked by the server and the board updates for everyone in real time.
+A mobile-friendly, shared strategy board. Players create an army or request to join an existing army from another device. The server checks actions and updates the board for every linked member in real time.
 
 ## Features
 
 - Private rooms with six-character invite codes and shareable links.
-- 2–12 players per game, with a randomly generated, completely open square board.
-- Live board updates, player roster, a restricted field log and room chat.
-- Player health, range and positions are visible to everyone. **AP is only sent to the player who owns it.**
-- Move, attack, upgrade range, add HP, gift AP and gift hearts (including reviving an eliminated player).
-- A private planning workspace with route planning, a costed action queue, projected AP budgets and private opponent AP estimates.
+- Up to **32 armies** per room, with up to 12 linked members/devices in each army.
+- Separate board width and height settings, each from 6 to 40 squares.
+- Custom AP interval from 1 minute to 7 days, plus an exact first AP tick date and time in the creator's local time zone.
+- Request-based army membership: the selected army can accept or decline each request. Multiple devices then control the same army.
+- Live board updates, roster, restricted field log and room chat.
+- Player health, range and positions are visible to everyone. Other armies' AP stays private until the game has ended.
+- Private inbox messages when another army gifts AP to you or the Jury awards your army bonus AP.
+- Move, attack, upgrade range, add HP, gift AP and gift hearts (including reviving an eliminated army).
+- Private planning mode for every army, including route planning, costed action queues, private AP estimates and future tick forecasts. Plans stay in that device's browser.
 - Clear range highlighting for attack and gift actions, using Manhattan distance.
-- An AP tick scheduler that catches up after the site has been idle, plus the Jury vote for eliminated players.
+- Event-by-event replay after the game ends, including each army's position, HP and AP after every recorded event.
 - PostgreSQL storage for hosted games, so rooms are not lost when the web server restarts.
 - Local JSON storage for running the app on your own computer.
 
@@ -28,9 +32,9 @@ Then open [http://localhost:3000](http://localhost:3000). Create a room in one b
 
 Without `DATABASE_URL`, the app saves rooms in `data/games.json`. This is useful for local testing. Do not rely on that local file for a hosted game unless your host explicitly provides persistent disk storage.
 
-## Put it on the internet for your friends
+## Host the game online
 
-The app needs a **Node web service**, not a static-only website host: Socket.IO runs on the server to keep all players on the same live board.
+The app needs a **Node web service**, not a static-only website host: Socket.IO runs on the server to keep all armies on the same live board.
 
 ### 1. Create a PostgreSQL database
 
@@ -40,7 +44,7 @@ The server creates its own `tank_turn_tactics_games` table on first start. You d
 
 ### 2. Put this folder in a GitHub repository
 
-Create a new repository and upload the contents of this folder (not the containing folder itself). Keep your database connection string out of GitHub; it belongs in the hosting provider's environment-variable settings.
+Create a repository and upload the contents of this folder (not the containing folder itself). Keep your database connection string out of GitHub; it belongs in the hosting provider's environment-variable settings.
 
 ### 3. Deploy the repository as a web service
 
@@ -61,31 +65,38 @@ The server enables PostgreSQL SSL by default. If your database provider specific
 
 When the deployment finishes, open the public `onrender.com` address and share that address with your players. To invite someone into a particular game, share the room link generated inside the game.
 
-## Rules in this version
+## Rules and settings
 
-- Each player begins with 3 HP, 0 AP and range 2.
-- Every AP tick, each living player gains 1 AP. The default is every 24 hours; the host can choose 1 minute for testing or 1 hour for a shorter game.
+- Each army begins with 3 HP, 0 AP and range 2.
+- The default AP interval is every 24 hours. The room creator can choose any interval from 1 minute to 7 days and set the exact first AP tick date/time. Later ticks repeat at the chosen interval from that first tick.
+- Every AP tick, each living army gains 1 AP.
 - Move one orthogonal square: 1 AP.
-- Attack a living player within your range: 1 AP and 1 damage.
+- Attack a living army within your range: 1 AP and 1 damage.
 - Add 1 HP: 3 AP.
 - Upgrade range by 1: 3 AP.
-- Gift 1 AP to a living player in range: 1 AP is transferred from you to them.
-- Gift 1 heart to a player in range: 3 AP. This adds 1 HP to a living player, or revives an eliminated player with 1 HP and 0 AP.
-- Eliminated players do not transfer their remaining AP to the player who eliminates them; unspent AP is lost.
-- Eliminated players stay on the board. Each can cast one Jury vote per AP cycle; a player receiving at least 3 votes gets 1 bonus AP at the next tick.
+- Gift 1 AP to a living army in range: 1 AP is transferred from you to them. The recipient gets a private notification; it is not written to the field log.
+- Gift 1 heart to an army in range: 3 AP. This adds 1 HP to a living army, or revives an eliminated army with 1 HP and 0 AP.
+- Eliminated armies do not transfer their remaining AP to the army that eliminates them; unspent AP is lost.
+- Eliminated armies stay on the board. Each can cast one Jury vote per AP cycle; an army receiving at least 3 votes gets 1 bonus AP at the next tick and a private notification.
 - The board has no rock obstacles or random bonus-heart pickups. The gift-heart action remains available.
-- The public field log only reports player movement/locations, that a player was hit (without naming the attacker), and who made a final hit that eliminated a player. AP transfers and other actions are not logged.
-- The game ends when one player remains alive.
+- The public field log only reports army movement/locations, that an army was hit (without naming the attacker), and which army made a final hit that eliminated another army. AP transfers and other actions are not logged.
+- The game ends when one army remains alive. Final AP becomes visible to everyone, and event replay becomes available.
 
-This edition uses Manhattan distance for range on the square board: range is counted in orthogonal steps, not straight-line distance. Planning mode is local to the player's browser; queued plans and AP estimates are not sent to the server. AP estimates are saved in that browser's local storage. The copy-plan action exports a text summary to the user's clipboard. It is a friends' adaptation, not an official digital rules implementation.
+Range uses Manhattan distance: range is counted in orthogonal steps, not straight-line distance.
+
+## Planning and replay
+
+Planning mode is entirely local to the current browser/device. It can hold a separate action queue for each army, show planned positions and projected costs, and use private estimates for other armies' AP. Future AP ticks can be included in forecasts. Plans and estimates are saved in that browser's local storage and are not sent to the server.
+
+When the game ends, the replay timeline lets players select any recorded event. The board and the replay roster show the position, HP and AP of every army at that point. The room keeps the most recent 5,000 event snapshots; replay history is stored with the room and does not require a separate database table.
 
 ## Important notes
 
-- The room code/link is the invitation. Anyone who has it can join while the lobby is open; new players cannot join after the game starts.
-- A player's session is saved in that browser. Players should use the same browser/device when returning to an existing game and should not clear the site's local storage.
-- This is a casual private-room game, not an account-secured competitive service. Do not put personal or sensitive information in player names or chat.
+- The room code/link is the invitation. Anyone who has it can create an army while the lobby is open, or request to join an existing army. The selected army must approve a membership request.
+- Each device has its own session key. Several devices can be linked to one army, and all linked devices control that same army. Members share its AP, HP, position, actions and private AP messages.
+- Keep the room link private to the people you intend to invite. This is a casual private-room game, not an account-secured competitive service. Do not put personal or sensitive information in callsigns or chat.
 - If the hosted app is restarted, PostgreSQL keeps the game state. The local JSON fallback is intended for local testing only.
 
 ## Updating an existing hosted game
 
-For the browser-based GitHub upload and Render redeployment steps, see [`UPDATE-GUIDE.md`](UPDATE-GUIDE.md). This release does not require a database migration or a new Supabase project.
+For the browser-based GitHub upload and Render redeployment steps, see [`UPDATE-GUIDE.md`](UPDATE-GUIDE.md). This release keeps the existing Supabase table and room-state storage; no SQL migration or new Supabase project is required.
