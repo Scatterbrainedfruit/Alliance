@@ -25,6 +25,10 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: true, methods: ["GET", "POST"] } });
 
+// Serve the browser client from the public directory.
+app.use(express.static(path.join(__dirname, "public")));
+app.get("/health", (_req, res) => res.json({ ok: true, storage: pool ? "postgres" : "local" }));
+
 let pool = null;
 const memoryGames = new Map();
 const roomLocks = new Map();
